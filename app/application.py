@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Callable
 
 class Pin:
     """
@@ -260,23 +261,43 @@ def create_nand_gate():
     connect(not_gate.output_pins[0], output_signal)
 
     return custom_chip_factory([signal_1, signal_2], [output_signal])
-    # return
 
 NandGate = create_nand_gate()
 
-
 class ChipRenderer:
-    def __init__(self, chip: Chip, position: tuple):
+    def __init__(self, chip: Chip, position: tuple = (0, 0)):
         self.chip = chip
         self.position = position
 
 
 class ChipEditor:
     def __init__(self):
-        pass
+        self.chip_renderers = [] # type: list[ChipRenderer]
+        self.input_signals = [] # type: list[SignalEmitter]
+        self.output_signals = [] # type: list[SignalReceiver]
+
+    def clear(self):
+        self.chip_renderers = []
+        self.input_signals = []
+        self.output_signals = []
+
+
+    def package(self, name=None):
+        ChipFactory = custom_chip_factory(self.input_signals, self.output_signals)
+        self.clear()
+        return ChipFactory
+
 
 class LogicWorkspace:
-    pass
+    def __init__(self):
+        self.chip_editor = ChipEditor()
+        self.chips_factories = [AndGate, NotGate, NandGate] # type:list[Callable[[], Chip]]
+
+    def create_chip(self, factory_index):
+        chip = self.chips_factories[factory_index]()
+        renderer = ChipRenderer(chip)
+
+        self.chip_editor.chip_renderers.append(renderer)
 
 
 class Application:
