@@ -14,7 +14,7 @@ from pygame.locals import (
 )
 
 
-from app.gui import ChipEditor
+from app.rendering.chipeditor import ChipEditor
 
 class Application:
 
