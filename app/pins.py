@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-class Pin:
-    """
-        Base class that does nothing but store a state of 0 or 1
-    """
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.chip import Chip
 
+
+class Pin:
     def __init__(self):
         self._state = 0
 
@@ -12,57 +13,73 @@ class Pin:
     def State(self):
         return self._state
 
-
-
-class SignalReceiver(Pin):
-    """
-        Base class for all pins that can fetch their state from multiple pins
-
-        (For example some sort of "input pins" can fetch state from multiple wires)
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.sources = [] # type: list[SignalEmitter]
-        self.last_state = 0
-    
-    def refresh_signal(self):
-        # the state of this pin is 1 if any of the sources has a state on 1, and 0 otherwise.
-        # Analogous to the fact that a wire carries current if at least one of the wires
-        # connecting it has current flowing through it
-        signal = 0
-        for source in self.sources:
-            if source.State == 1:
-                signal = 1
-                break
-        self.last_state = self._state
+    def recv_signal(self, signal):
         self._state = signal
 
 
 class SignalEmitter(Pin):
-    """
-    Base class for all pins that can send their state to multiple pins.
-
-    (For example an output pin of a component can be further connected to multiple pins)
-    """
     def __init__(self):
         super().__init__()
-        self.listeners = [] # type: list[SignalReceiver]
+
+        self.children = []  # type: list[Pin]
 
     def broadcast_signal(self, signal):
-        if self._state != signal:
-            self._state = signal
-            for listener in self.listeners:
-                listener.refresh_signal()
+        for child in self.children:
+            child.recv_signal(signal)
+
+    def connect_to(self, target: Pin):
+        self.children.append(target)
+        target.recv_signal(self._state)
+
+    
+    def disconnect_from(self, target: Pin):
+        self.children.remove(target)
+        target.recv_signal(0)
 
 
+class ChipPin(SignalEmitter):
+    """
+        Base class for all pins that are either ON or OFF
+    """
 
-def connect(emitter: SignalEmitter, listener: SignalReceiver):
-    emitter.listeners.append(listener)
-    listener.sources.append(emitter)
-    listener.refresh_signal()
+    class PinType:
+        INPUT = 1
+        OUTPUT = 2
 
-def disconnect(emitter: SignalEmitter, listener: SignalReceiver):
-    emitter.listeners.remove(listener)
-    listener.sources.remove(emitter)
-    listener.refresh_signal()
+    def __init__(self):
+        super().__init__()
+
+        self.chip = None  # type: Chip
+        self.index = -1
+        self.pin_type = 0
+
+    def set_chip(self, chip: Chip):
+        self.chip = chip
+
+    def recv_signal(self, signal):
+
+        # Don't do anything if nothing changed
+        if self._state == signal:
+            return
+
+        self._state = signal
+        if self.pin_type == self.PinType.INPUT:
+            self.chip.process_output()
+        else:
+            self.broadcast_signal(signal)
+
+
+class InputSignalPin(SignalEmitter):
+    def __init__(self):
+        super().__init__()
+        self.index = -1
+
+    def recv_signal(self, signal):
+        self._state = signal
+        self.broadcast_signal(signal)
+
+
+class OutputSignalPin(Pin):
+    def __init__(self):
+        self.index = -1
+

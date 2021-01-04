@@ -1,47 +1,18 @@
 from __future__ import annotations
-from typing import Callable
 
-from app.pins import SignalReceiver, SignalEmitter
+import pathlib
+import sys
+root = pathlib.Path('.').parent.resolve().absolute()
+sys.path.append(str(root))
 
-class ChipInputPin(SignalReceiver):
-    # the chip this pin belongs to
-    chip: Chip
-
-    # index of the pin with respect to its parent chip
-    index: int = -1
-
-    def __init__(self, chip: Chip):
-        super().__init__()
-        self.chip = chip
-
-    def refresh_signal(self):
-        super().refresh_signal()
-
-        # this check below is crucial because ouput from a component
-        # can be connected to its input, so when the the output
-        # is calculated, it calls refresh_signal of all SignalReceivers it is
-        # connected to, including this input which will forward it to
-        # the chip, which will forward it again to the output and this recursive
-        # loop keeps going on, so ask the chip to calculate output only when its
-        # inputs change, which prevents recursion and as a bonus prevents unnecessary
-        # calculations
-        if self.last_state != self._state:
-            self.chip.process_output()
-
-    # temporary function used for debugging
-    def force_update_signal(self, signal):
-        if signal != self._state:
-            self.last_state = self._state
-            self._state = signal
-            self.chip.process_output()
-
+# from typing import Callable
+from app.pins import ChipPin, InputSignalPin, OutputSignalPin
 
 class Chip:
 
     """Base class for all chips"""
 
     name = "Untitled"
-
 
     @property
     def InputPinCount(self):
@@ -52,8 +23,8 @@ class Chip:
         return self._len_output_pins
 
     def __init__(self):
-        self.input_pins = [] # type: list[ChipInputPin]
-        self.output_pins = [] # type: list[SignalEmitter]
+        self.input_pins = [] # type: list[ChipPin]
+        self.output_pins = [] # type: list[ChipPin]
 
          # they are used quite often and they do not change once set, so cache them
         self._len_input_pins = -1
@@ -73,6 +44,19 @@ class Chip:
         # an initial output of 0 (the default state of output pins)
         # when it should be having a value of 1
         self.process_output()
+
+
+    def _add_pin(self, pin_type):
+        pin = ChipPin()
+        pin.pin_type = pin_type
+        if pin_type == ChipPin.PinType.INPUT:
+            self.input_pins.append(pin)
+        else:
+            self.output_pins.append(pin)
+
+        pin.set_chip(self)
+        return pin
+        
             
     def process_output(self):
         """
@@ -82,11 +66,9 @@ class Chip:
         # meant to be implemented by child classes
 
 
-
-
 class CustomChip(Chip):
 
-    def __init__(self, name: str, input_signals: list[SignalEmitter], output_signals: list[SignalReceiver]):
+    def __init__(self, name: str, input_signals: list[InputSignalPin], output_signals: list[OutputSignalPin]):
 
         """
         Class used to bundle a set of components connected together into a single chip
@@ -105,7 +87,7 @@ class CustomChip(Chip):
         then resulting chip will be like
 
             chip's input pins -> input signals -> ... components ... -> output signals -> chip's output pins  
-        """
+        """ 
         
         super().__init__()
         self.name = name
@@ -114,10 +96,10 @@ class CustomChip(Chip):
         self.output_signals = output_signals
 
         for _ in range(len(input_signals)):
-            self.input_pins.append(ChipInputPin(self))
+            self._add_pin(ChipPin.PinType.INPUT)
 
         for _ in range(len(output_signals)):
-            self.output_pins.append(SignalEmitter())
+            self._add_pin(ChipPin.PinType.OUTPUT)
 
         self.initialize_pins()
 
@@ -125,15 +107,56 @@ class CustomChip(Chip):
     def process_output(self):
         # forwars signals from input pins to the first layer of input signals
         for i in range(self.InputPinCount):
-            self.input_signals[i].broadcast_signal(self.input_pins[i].State)
+            self.input_signals[i].recv_signal(self.input_pins[i].State)
 
         # forwars signals from output signal layer (2nd last layer) to output pins
         for i in range(self.OutputPinCount):
-            self.output_pins[i].broadcast_signal(self.output_signals[i].State)
+            self.output_pins[i].recv_signal(self.output_signals[i].State)
 
     
-def custom_chip_factory(name, input_signals: list[SignalEmitter], output_signals: list[SignalReceiver]):
+def custom_chip_factory(name, input_signals: list[InputSignalPin], output_signals: list[OutputSignalPin]):
     def _f():
         return CustomChip(name, input_signals, output_signals)
 
     return _f
+
+
+# def test(s1: InputSignalPin, s2: InputSignalPin, s3: OutputSignalPin, p1, p2):
+#     s1.recv_signal(p1)
+#     s2.recv_signal(p2)
+
+#     res = s3.State
+    
+#     print(f"{p1} OP {p2} = {res}")
+
+# def test(gate: Chip, p1, p2):
+#     gate.input_pins[0].recv_signal(p1)
+#     gate.input_pins[1].recv_signal(p2)
+
+#     res = gate.output_pins[0].State
+    
+#     print(f"{p1} {gate.name} {p2} = {res}")
+
+
+# s1 = InputSignalPin()
+# s2 = InputSignalPin()
+# s3 = OutputSignalPin()
+
+# gate = AndGate()
+# no = NotGate()
+
+# s1.connect_to(gate.input_pins[0])
+# s2.connect_to(gate.input_pins[1])
+
+# gate.output_pins[0].connect_to(no.input_pins[0])
+# no.output_pins[0].connect_to(s3)
+
+# NandGate = custom_chip_factory('NAND', [s1, s2], [s3])
+
+# g = NandGate()
+
+
+# test(g, 0, 0)
+# test(g, 0, 1)
+# test(g, 1, 0)
+# test(g, 1, 1)

@@ -140,7 +140,7 @@ class ChipRenderer:
         pg.draw.rect(surface, self.CHIP_HOVER_BORDER_COLOR, pg.Rect(left, top, self.bound_width, self.bound_height))
 
     def check_collision(self, x, y):
-        # i wasted 1 hour debugging because i accidently swapped the indices 0 and 1 below
+        # GOLD: I wasted 1 hour debugging because I accidently swapped the indices 0 and 1 below
         left = self.position[0] - self.pin_radius
         top = self.position[1] - self.pin_radius
 
