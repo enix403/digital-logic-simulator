@@ -10,6 +10,8 @@ from .chiprenderer import ChipRenderer
 class ChipEditor:
 
     EDITOR_BACKGROUND = (50, 50, 50)
+    WIRE_COLOR_OFF = (36, 39, 46)
+    WIRE_COLOR_ON = (236, 34, 56)
 
     STATE_IDLE = 0
     STATE_CHIP_MOVING = 1
@@ -29,7 +31,7 @@ class ChipEditor:
         self.chip_renderers.append(ChipRenderer(AndGate(), (350, 420)))
         self.chip_renderers.append(ChipRenderer(NotGate(), (150, 150)))
 
-        self.state = self.STATE_PLACING_WIRE
+        self.state = self.STATE_IDLE
 
         self.mouse_x = 0
         self.mouse_y = 0
@@ -38,7 +40,7 @@ class ChipEditor:
         self.mouse_start_offset = (0, 0)
         self.mouse_start_position = (0, 0)
 
-        self.src_pin_loc = PinLocation(1, PinLocation.PIN_LOC_CHIP_OUT, 0)
+        self.src_pin_loc = PinLocation()
         self.dest_pin_loc = PinLocation()
 
 
@@ -47,8 +49,6 @@ class ChipEditor:
         dest = PinLocation(1, PinLocation.PIN_LOC_CHIP_IN, 0)
         conn = WireConnection(src, dest)
         self.wire_connections.append(conn)
-
-
 
     @property
     def RenderResult(self):
@@ -88,7 +88,7 @@ class ChipEditor:
         end = self.chip_renderers[conn.dest.chip_index].get_pin_pos(conn.dest.pin_type, conn.dest.pin_index)
         # gfxdraw.line(self.surface, start[0], start[1], end[0], end[1], ChipRenderer.WIRE_COLOR_ON)
         # pg.draw.line(self.surface, ChipRenderer.WIRE_COLOR_ON, start, end)
-        pg.draw.aaline(self.surface, ChipRenderer.WIRE_COLOR_ON, start, end)
+        pg.draw.aaline(self.surface, self.WIRE_COLOR_ON, start, end)
 
 
     def draw(self):
@@ -99,7 +99,7 @@ class ChipEditor:
         if self.state == self.STATE_PLACING_WIRE:
             loc = self.src_pin_loc
             start = self.chip_renderers[loc.chip_index].get_pin_pos(loc.pin_type, loc.pin_index)
-            pg.draw.aaline(self.surface, ChipRenderer.WIRE_COLOR_OFF, start, (self.mouse_x, self.mouse_y))
+            pg.draw.aaline(self.surface, self.WIRE_COLOR_OFF, start, (self.mouse_x, self.mouse_y))
 
         for i, renderer in enumerate(self.chip_renderers):
             if i == self.selected_chip_index:
