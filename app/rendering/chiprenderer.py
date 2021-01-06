@@ -39,7 +39,7 @@ class ChipRenderer:
         self.position = position
 
         # location (index and type) of pin currently under the mouse 
-        self.hovered_pin_type = PinLocation.PIN_LOC_NONE
+        self.hovered_pin_type = PinLocation.PL_NONE
         self.hovered_pin_index = -1
 
         # cached y-coordinates (relative to top left of chip) of chip's input and output pins
@@ -83,14 +83,14 @@ class ChipRenderer:
 
         # draw input and output pins
         for i, y in enumerate(self.input_pins_y):
-            if self.hovered_pin_type == PinLocation.PIN_LOC_CHIP_IN and self.hovered_pin_index == i:
+            if self.hovered_pin_type == PinLocation.PL_CHIP_IN and self.hovered_pin_index == i:
                 color = self.PIN_HOVER_COLOR
             else:
                 color = self.PIN_COLOR
             draw_circle(surface, self.position[0], self.position[1] + y, self.PIN_RADIUS, color)
 
         for i, y in enumerate(self.output_pins_y):
-            if self.hovered_pin_type == PinLocation.PIN_LOC_CHIP_OUT and self.hovered_pin_index == i:
+            if self.hovered_pin_type == PinLocation.PL_CHIP_OUT and self.hovered_pin_index == i:
                 color = self.PIN_HOVER_COLOR
             else:
                 color = self.PIN_COLOR
@@ -104,7 +104,7 @@ class ChipRenderer:
         """"
             Returns the coordinates of pin identified by its type and index
         """
-        if pin_type == PinLocation.PIN_LOC_CHIP_IN:
+        if pin_type == PinLocation.PL_CHIP_IN:
             x = 0
             y = self.input_pins_y[index]
         else:
@@ -120,7 +120,7 @@ class ChipRenderer:
         """
 
         self.hovered_pin_index = -1
-        self.hovered_pin_type = PinLocation.PIN_LOC_NONE
+        self.hovered_pin_type = PinLocation.PL_NONE
 
         x = self.position[0]
 
@@ -128,12 +128,12 @@ class ChipRenderer:
         # of pins is relatively small, mouse coordinates are
         # only checked to be inside the square of side length
         # equal to the pin's diameter and centered at the pin
-        # center as it is way faster
+        # center as it is faster
         if mouse_x >= x - self.PIN_RADIUS and mouse_x <= x + self.PIN_RADIUS:
             for i, y in enumerate(self.input_pins_y):
                 pin_y = self.position[1] + y 
                 if mouse_y >= pin_y - self.PIN_RADIUS and mouse_y <= pin_y + self.PIN_RADIUS:
-                    self.hovered_pin_type = PinLocation.PIN_LOC_CHIP_IN
+                    self.hovered_pin_type = PinLocation.PL_CHIP_IN
                     self.hovered_pin_index = i
                     return (self.hovered_pin_type, self.hovered_pin_index)
                     
@@ -143,7 +143,7 @@ class ChipRenderer:
             for i, y in enumerate(self.output_pins_y):
                 pin_y = self.position[1] + y
                 if mouse_y >= pin_y - self.PIN_RADIUS and mouse_y <= pin_y + self.PIN_RADIUS:
-                    self.hovered_pin_type = PinLocation.PIN_LOC_CHIP_OUT
+                    self.hovered_pin_type = PinLocation.PL_CHIP_OUT
                     self.hovered_pin_index = i
                     return (self.hovered_pin_type, self.hovered_pin_index)
 

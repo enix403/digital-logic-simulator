@@ -1,4 +1,9 @@
 from __future__ import annotations
+
+import math
+
+import pygame as pg
+
 from pygame import gfxdraw
 from pygame import freetype
 
