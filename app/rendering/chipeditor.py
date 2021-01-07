@@ -23,28 +23,11 @@ class ChipEditor:
     STATE_PLACING_WIRE = 2
 
 
-    ## Valid Connections
-
-    # sig in -> chip in
-    # chip in -> chip out
-    # chip out -> sig out
-
-    # (above but reversed)
-
-    # sig out -> chip out
-    # chip out -> chip in
-    # chip in -> sig in
-
     _VALID_CONNECTIONS = (
         (PinLoc.PL_SIG_IN, PinLoc.PL_CHIP_IN),
-        (PinLoc.PL_CHIP_IN, PinLoc.PL_CHIP_OUT),
+        (PinLoc.PL_CHIP_OUT, PinLoc.PL_CHIP_IN),
         (PinLoc.PL_CHIP_OUT, PinLoc.PL_SIG_OUT),
-
-        # (PinLoc.PL_SIG_OUT, PinLoc.PL_CHIP_OUT),
-        # (PinLoc.PL_CHIP_OUT, PinLoc.PL_CHIP_IN),
-        # (PinLoc.PL_CHIP_IN, PinLoc.PL_SIG_IN),
     )
-
 
 
     def __init__(self, width, height):
@@ -60,7 +43,7 @@ class ChipEditor:
 
         self.chip_renderers.append(ChipRenderer(AndGate(), (350, 420)))
         self.chip_renderers.append(ChipRenderer(NotGate(), (150, 150)))
-        self.chip_renderers.append(ChipRenderer(NotGate(), (150, 150)))
+        self.chip_renderers.append(ChipRenderer(NotGate(), (290, 90)))
 
         self.state = self.STATE_IDLE
 
@@ -91,50 +74,24 @@ class ChipEditor:
     #     self.output_signals = []
   
     def on_mouse_down(self):
-        
+
         if self.state == self.STATE_IDLE:
+            # if a source pin is currently being hovered, then select it and wait for the target pin
             if not self.src_pin_loc.is_empty():
                 self.state = self.STATE_PLACING_WIRE
             else:
                 self.select_hovered_chip()
+                # if clicked on a hovered chip, select it and remember mouse position relative to chip
+                # (to make dragging look a bit natural) and start the drag
                 if self.selected_chip_index != -1:
                     self.state = self.STATE_CHIP_MOVING
                     self.mouse_start_offset = self.chip_renderers[self.selected_chip_index].position
                     self.mouse_start_position = (self.mouse_x, self.mouse_y)
 
         elif self.state == self.STATE_PLACING_WIRE:
-            # add permanent connection
-            if not self.src_pin_loc.is_empty() and not self.dest_pin_loc.is_empty():
-                # check if valid
-                # print(self.src_pin_loc, self.dest_pin_loc)
-
-                # source_loc, target_loc = self.sort_io_pinloc(self.src_pin_loc, self.dest_pin_loc)
-
-                source_loc = self.src_pin_loc
-                target_loc = self.dest_pin_loc
-
-                if (source_loc.pin_type, target_loc.pin_type) in self._VALID_CONNECTIONS:
-                    same_chip = source_loc.chip_index == target_loc.chip_index and source_loc.chip_index != -1
-                    if not same_chip:
-                        self.wire_connections.append(
-                            WireConnection(source_loc.clone(), target_loc.clone())
-                        )
-            self.src_pin_loc.clear()
-            self.dest_pin_loc.clear()
+            self.place_wire()
             self.state = self.STATE_IDLE
 
-    def sort_io_pinloc(self, loc1: PinLoc, loc2: PinLoc):
-        if loc1.pin_type == PinLoc.PL_CHIP_IN or loc1.pin_type == PinLoc.PL_SIG_IN:
-            return loc1, loc2
-
-        return loc2, loc1
-
-    def pin_from_loc(self, loc: PinLoc):
-        if loc.pin_type == PinLoc.PL_CHIP_IN:
-            return self.chip_renderers[loc.chip_index].chip.input_pins[loc.pin_index]
-
-        if loc.pin_type == PinLoc.PL_CHIP_OUT:
-            return self.chip_renderers[loc.chip_index].chip.output_pins[loc.pin_index]
 
     def on_mouse_up(self):
         if self.state == self.STATE_CHIP_MOVING:
@@ -144,7 +101,63 @@ class ChipEditor:
         self.mouse_x = mouse_x
         self.mouse_y = mouse_y
 
+
+
+    def place_wire(self):
+        if not self.src_pin_loc.is_empty() and not self.dest_pin_loc.is_empty():
+            source_loc = self.src_pin_loc
+            target_loc = self.dest_pin_loc
+
+            valid = False
+            swap = False
+
+            # make sure the connection is valid and swap pin links if placed in reversed direction 
+            if (source_loc.pin_type, target_loc.pin_type) in self._VALID_CONNECTIONS:
+                valid = True
+            elif (target_loc.pin_type, source_loc.pin_type) in self._VALID_CONNECTIONS:
+                valid = True
+                swap = True
+
+            if valid:
+                if swap:
+                    source_loc, target_loc = target_loc, source_loc
+
+                same_chip = source_loc.chip_index == target_loc.chip_index and source_loc.chip_index != -1
+                if not same_chip:
+
+                    source_pin = self.pin_from_loc(source_loc)
+                    target_pin = self.pin_from_loc(target_loc)
+
+                    # notify actual pins about connection
+                    source_pin.connect_to(target_pin)
+
+                    self.wire_connections.append(
+                        WireConnection(source_loc.clone(), target_loc.clone())
+                    )
+
+        self.src_pin_loc.clear()
+        self.dest_pin_loc.clear()
+
+
+    def pin_from_loc(self, loc: PinLoc):
+        """
+        Returns the actual underlying pin given its location
+        """
+        if loc.pin_type == PinLoc.PL_CHIP_IN:
+            return self.chip_renderers[loc.chip_index].chip.input_pins[loc.pin_index]
+
+        if loc.pin_type == PinLoc.PL_CHIP_OUT:
+            return self.chip_renderers[loc.chip_index].chip.output_pins[loc.pin_index]
+
+
+    def connection_from_target_loc(self, target_loc):
+        pass
+
+    
     def select_hovered_chip(self):
+        """
+        'Activates' the pin that is currenly under the mouse
+        """
         self.selected_chip_index = -1
         for i, renderer in enumerate(self.chip_renderers):
             if renderer.check_collision(self.mouse_x, self.mouse_y):
@@ -156,11 +169,12 @@ class ChipEditor:
             start = self.chip_renderers[conn.source.chip_index].get_pin_pos(conn.source.pin_type, conn.source.pin_index)
             end = self.chip_renderers[conn.dest.chip_index].get_pin_pos(conn.dest.pin_type, conn.dest.pin_index)
             pin = self.pin_from_loc(conn.source)
-            # pin2 = self.pin_from_loc(conn.dest)
+            # pin = self.pin_from_loc(conn.dest)
 
             # print(conn.source, conn.dest)
 
-            pg.draw.line(self.surface, self.WIRE_COLOR_OFF if pin.State == 0 else self.WIRE_COLOR_ON, start, end, width=3)
+            # pg.draw.line(self.surface, self.WIRE_COLOR_OFF if pin.State == 0 else self.WIRE_COLOR_ON, start, end, width=3)
+            pg.draw.aaline(self.surface, self.WIRE_COLOR_OFF if pin.State == 0 else self.WIRE_COLOR_ON, start, end)
             # gfxdraw.line(self.surface, start[0], start[1], end[0], end[1], self.WIRE_COLOR_OFF)
             # pg.draw.aaline(self.surface, self.WIRE_COLOR_OFF, start, end)
 
@@ -199,11 +213,12 @@ class ChipEditor:
 
             target_offset = (self.mouse_start_offset[0] + relative_offset[0], self.mouse_start_offset[1] + relative_offset[1])
             selected_renderer.move_to(target_offset[0], target_offset[1])
-            self.src_pin_loc.clear()
-            self.dest_pin_loc.clear()
+            # self.src_pin_loc.clear()
+            # self.dest_pin_loc.clear()
 
 
         else:
+            # This piece of code ONLY keeps track of what pin is currently under mouse
             if self.state == self.STATE_PLACING_WIRE:
                 target_loc = self.dest_pin_loc
             else:
